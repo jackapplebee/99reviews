@@ -15,6 +15,24 @@ async function scrapeGoogleReviews() {
   try {
     console.log('Starting Google Reviews scrape...');
     
+    // Step 1: Get the most recent review date from Bubble to avoid duplicates
+    let lastReviewDate = new Date('2025-08-20'); // Default fallback
+    
+    try {
+      const existingReviewsResponse = await fetch(`${BUBBLE_API_URL}?api_token=${BUBBLE_API_TOKEN}&sort_field=review_date&descending=true&limit=1`);
+      if (existingReviewsResponse.ok) {
+        const existingData = await existingReviewsResponse.json();
+        if (existingData.response?.results?.length > 0) {
+          lastReviewDate = new Date(existingData.response.results[0].review_date);
+          console.log(`Last review in database: ${lastReviewDate.toISOString()}`);
+        }
+      }
+    } catch (error) {
+      console.log('Could not fetch existing reviews, using default date');
+    }
+    
+    // Step 2: Initiate scraping request to Outscraper
+    
     // Step 1: Initiate scraping request to Outscraper
     const outscraper_url = 'https://api.outscraper.com/maps/reviews-v3';
     
@@ -96,23 +114,23 @@ async function scrapeGoogleReviews() {
     const business = finalData.data[0];
     const allReviews = business.reviews_data || [];
     
-    // Filter reviews to only include those from August 20, 2025 onwards
-    const cutoffDate = new Date('2025-08-20');
-    const recentReviews = allReviews.filter(review => {
+    // Filter reviews to only include NEW ones (newer than last review in database)
+    const newReviews = allReviews.filter(review => {
       if (!review.review_datetime_utc) return false;
       const reviewDate = new Date(review.review_datetime_utc);
-      return reviewDate >= cutoffDate;
+      return reviewDate > lastReviewDate; // Only reviews AFTER the last one we have
     });
     
-    console.log(`Found ${allReviews.length} total reviews, ${recentReviews.length} since August 20, 2025`);
+    console.log(`Found ${allReviews.length} total reviews, ${newReviews.length} are new since ${lastReviewDate.toDateString()}`);
     
-    let newReviews = 0;
+    if (newReviews.length === 0) {
+      console.log('No new reviews to process');
+      return { success: true, newReviews: 0, totalReviews: 0 };
+    }
     
-    for (const review of recentReviews) {
-      // Debug: Log the complete review object to see all available fields
-      console.log('Full review object keys:', Object.keys(review));
-      console.log('Sample review data:', JSON.stringify(review, null, 2).substring(0, 500));
-      
+    let addedReviews = 0;
+    
+    for (const review of newReviews) {
       // Debug: Log the review structure to see available fields
       console.log('Processing review:', {
         author: review.review_author_name,
@@ -137,12 +155,6 @@ async function scrapeGoogleReviews() {
         google_review_id: review.review_id || `${reviewerName}_${review.review_datetime_utc}`
       };
       
-      // Only process the first review for debugging, then break
-      if (newReviews === 0) {
-        console.log('First review full structure for debugging:');
-        console.log(JSON.stringify(review, null, 2));
-      }
-      
       // Send to Bubble
       try {
         const bubbleResponse = await fetch(`${BUBBLE_API_URL}?api_token=${BUBBLE_API_TOKEN}`, {
@@ -154,7 +166,7 @@ async function scrapeGoogleReviews() {
         });
         
         if (bubbleResponse.ok) {
-          newReviews++;
+          addedReviews++;
           console.log(`Added review from ${bubbleReview.reviewer_name}`);
         } else {
           const errorText = await bubbleResponse.text();
@@ -169,8 +181,8 @@ async function scrapeGoogleReviews() {
       }
     }
     
-    console.log(`Scraping complete. Added ${newReviews} new reviews out of ${recentReviews.length} total recent reviews.`);
-    return { success: true, newReviews, totalReviews: recentReviews.length };
+    console.log(`Scraping complete. Added ${addedReviews} new reviews out of ${newReviews.length} total new reviews.`);
+    return { success: true, newReviews: addedReviews, totalReviews: newReviews.length };
     
   } catch (error) {
     console.error('Scraping failed:', error);
