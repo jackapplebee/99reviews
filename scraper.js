@@ -1,3 +1,6 @@
+// Import fetch for Node.js compatibility
+const fetch = require('node-fetch');
+
 // Google Reviews Scraper - Outscraper to Bubble Integration
 // For GitHub Actions deployment with 30-minute scheduling
 
@@ -83,12 +86,6 @@ async function scrapeGoogleReviews() {
     console.error('Scraping failed:', error);
     return { success: false, error: error.message };
   }
-}
-
-// Manual execution function
-async function runScraper() {
-  const result = await scrapeGoogleReviews();
-  console.log('Scraper result:', result);
 }
 
 // For automation (can be called by cron job, etc.)
