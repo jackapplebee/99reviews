@@ -18,15 +18,10 @@ async function scrapeGoogleReviews() {
     // Step 1: Initiate scraping request to Outscraper
     const outscraper_url = 'https://api.outscraper.com/maps/reviews-v3';
     
-    // Calculate cutoff date (August 20, 2025)
-    const cutoffDate = new Date('2025-08-20');
-    const cutoffUnix = Math.floor(cutoffDate.getTime() / 1000);
-    
     const params = new URLSearchParams({
       query: GOOGLE_BUSINESS_URL,
       reviewsLimit: 50,
       language: 'en',
-      start: cutoffUnix.toString(), // Only get reviews from this timestamp onwards
       sort: 'newest' // Get newest reviews first
     });
     
@@ -99,20 +94,43 @@ async function scrapeGoogleReviews() {
     }
     
     const business = finalData.data[0];
-    const reviews = business.reviews_data || [];
+    const allReviews = business.reviews_data || [];
     
-    console.log(`Found ${reviews.length} reviews to process`);
+    // Filter reviews to only include those from August 20, 2025 onwards
+    const cutoffDate = new Date('2025-08-20');
+    const recentReviews = allReviews.filter(review => {
+      if (!review.review_datetime_utc) return false;
+      const reviewDate = new Date(review.review_datetime_utc);
+      return reviewDate >= cutoffDate;
+    });
+    
+    console.log(`Found ${allReviews.length} total reviews, ${recentReviews.length} since August 20, 2025`);
     
     let newReviews = 0;
     
-    for (const review of reviews) {
-      // Format data for Bubble
+    for (const review of recentReviews) {
+      // Debug: Log the review structure to see available fields
+      console.log('Processing review:', {
+        author: review.review_author_name,
+        author_alt: review.author_name,
+        name: review.name,
+        rating: review.review_rating,
+        date: review.review_datetime_utc
+      });
+      
+      // Format data for Bubble - try multiple field names for author
+      const reviewerName = review.review_author_name || 
+                          review.author_name || 
+                          review.name || 
+                          review.reviewer_name || 
+                          'Anonymous';
+      
       const bubbleReview = {
         rating: review.review_rating || 0,
-        reviewer_name: review.review_author_name || 'Anonymous',
+        reviewer_name: reviewerName,
         review_text: review.review_text || '',
         review_date: review.review_datetime_utc ? new Date(review.review_datetime_utc).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-        google_review_id: review.review_id || `${review.review_author_name}_${review.review_datetime_utc}`
+        google_review_id: review.review_id || `${reviewerName}_${review.review_datetime_utc}`
       };
       
       // Send to Bubble
