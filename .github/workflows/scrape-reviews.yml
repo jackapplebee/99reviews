@@ -1,3 +1,4 @@
+
 # .github/workflows/scrape-reviews.yml
 name: Scrape Google Reviews
 
@@ -21,7 +22,7 @@ jobs:
         node-version: '18'
     
     - name: Install dependencies
-      run: npm install node-fetch
+      run: npm install
     
     - name: Run scraper
       env:
