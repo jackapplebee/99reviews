@@ -17,10 +17,17 @@ async function scrapeGoogleReviews() {
     
     // Step 1: Initiate scraping request to Outscraper
     const outscraper_url = 'https://api.outscraper.com/maps/reviews-v3';
+    
+    // Calculate cutoff date (August 20, 2025)
+    const cutoffDate = new Date('2025-08-20');
+    const cutoffUnix = Math.floor(cutoffDate.getTime() / 1000);
+    
     const params = new URLSearchParams({
       query: GOOGLE_BUSINESS_URL,
       reviewsLimit: 50,
-      language: 'en'
+      language: 'en',
+      start: cutoffUnix.toString(), // Only get reviews from this timestamp onwards
+      sort: 'newest' // Get newest reviews first
     });
     
     const scrapeResponse = await fetch(`${outscraper_url}?${params}`, {
