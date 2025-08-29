@@ -15,21 +15,18 @@ async function scrapeGoogleReviews() {
   try {
     console.log('Starting Google Reviews scrape...');
     
-    // Step 1: Get the most recent review date from Bubble to avoid duplicates
-    let lastReviewDate = new Date('2025-08-20'); // Default fallback
+    // Step 1: Set up 24-hour window from 4am yesterday to 4am today (London time)
+    const now = new Date();
     
-    try {
-      const existingReviewsResponse = await fetch(`${BUBBLE_API_URL}?api_token=${BUBBLE_API_TOKEN}&sort_field=review_date&descending=true&limit=1`);
-      if (existingReviewsResponse.ok) {
-        const existingData = await existingReviewsResponse.json();
-        if (existingData.response?.results?.length > 0) {
-          lastReviewDate = new Date(existingData.response.results[0].review_date);
-          console.log(`Last review in database: ${lastReviewDate.toISOString()}`);
-        }
-      }
-    } catch (error) {
-      console.log('Could not fetch existing reviews, using default date');
-    }
+    // Calculate 4am today London time
+    const today4am = new Date();
+    today4am.setHours(4, 0, 0, 0);
+    
+    // Calculate 4am yesterday London time  
+    const yesterday4am = new Date(today4am);
+    yesterday4am.setDate(yesterday4am.getDate() - 1);
+    
+    console.log(`Looking for reviews between: ${yesterday4am.toISOString()} and ${today4am.toISOString()}`);
     
     // Step 2: Initiate scraping request to Outscraper
     
@@ -114,17 +111,17 @@ async function scrapeGoogleReviews() {
     const business = finalData.data[0];
     const allReviews = business.reviews_data || [];
     
-    // Filter reviews to only include NEW ones (newer than last review in database)
+    // Filter reviews to only include those between 4am yesterday and 4am today
     const newReviews = allReviews.filter(review => {
       if (!review.review_datetime_utc) return false;
       const reviewDate = new Date(review.review_datetime_utc);
-      return reviewDate > lastReviewDate; // Only reviews AFTER the last one we have
+      return reviewDate >= yesterday4am && reviewDate < today4am;
     });
     
-    console.log(`Found ${allReviews.length} total reviews, ${newReviews.length} are new since ${lastReviewDate.toDateString()}`);
+    console.log(`Found ${allReviews.length} total reviews, ${newReviews.length} between 4am yesterday and 4am today`);
     
     if (newReviews.length === 0) {
-      console.log('No new reviews to process');
+      console.log('No new reviews in the 24-hour window');
       return { success: true, newReviews: 0, totalReviews: 0 };
     }
     
