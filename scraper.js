@@ -15,11 +15,11 @@ async function scrapeGoogleReviews() {
   try {
     console.log('Starting Google Reviews scrape...');
     
-    // Step 1: Scrape reviews from Outscraper
+    // Step 1: Initiate scraping request to Outscraper
     const outscraper_url = 'https://api.outscraper.com/maps/reviews-v3';
     const params = new URLSearchParams({
       query: GOOGLE_BUSINESS_URL,
-      reviewsLimit: 50, // Adjust as needed
+      reviewsLimit: 50,
       language: 'en'
     });
     
@@ -35,11 +35,66 @@ async function scrapeGoogleReviews() {
     }
     
     const scrapeData = await scrapeResponse.json();
-    console.log('Scraped data:', scrapeData);
+    console.log('Initial response:', scrapeData);
     
-    // Step 2: Process and send reviews to Bubble
-    const business = scrapeData.data[0]; // First business result
+    // Step 2: Handle async response
+    let finalData;
+    if (scrapeData.status === 'Pending' && scrapeData.results_location) {
+      console.log('Request is pending, waiting for results...');
+      
+      // Wait and poll for results
+      let attempts = 0;
+      const maxAttempts = 12; // 2 minutes max wait
+      
+      while (attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 10000)); // Wait 10 seconds
+        attempts++;
+        
+        console.log(`Checking results... attempt ${attempts}`);
+        
+        const resultsResponse = await fetch(scrapeData.results_location, {
+          headers: {
+            'X-API-KEY': OUTSCRAPER_API_KEY
+          }
+        });
+        
+        if (resultsResponse.ok) {
+          const resultsData = await resultsResponse.json();
+          
+          if (resultsData.status === 'Success' && resultsData.data) {
+            finalData = resultsData;
+            break;
+          } else if (resultsData.status === 'Failed') {
+            throw new Error('Outscraper request failed');
+          }
+          
+          console.log(`Still pending... (${resultsData.status})`);
+        }
+      }
+      
+      if (!finalData) {
+        throw new Error('Request timed out waiting for results');
+      }
+      
+    } else if (scrapeData.data) {
+      // Immediate results
+      finalData = scrapeData;
+    } else {
+      throw new Error('No data returned from Outscraper');
+    }
+    
+    console.log('Final scraped data:', finalData);
+    
+    // Step 3: Process and send reviews to Bubble
+    if (!finalData.data || !finalData.data[0]) {
+      console.log('No business data found');
+      return { success: true, newReviews: 0, totalReviews: 0 };
+    }
+    
+    const business = finalData.data[0];
     const reviews = business.reviews_data || [];
+    
+    console.log(`Found ${reviews.length} reviews to process`);
     
     let newReviews = 0;
     
@@ -68,7 +123,7 @@ async function scrapeGoogleReviews() {
           console.log(`Added review from ${bubbleReview.reviewer_name}`);
         } else {
           const errorText = await bubbleResponse.text();
-          console.log(`Failed to add review: ${errorText}`);
+          console.log(`Failed to add review from ${bubbleReview.reviewer_name}: ${errorText}`);
         }
         
         // Add small delay to avoid rate limiting
@@ -79,7 +134,7 @@ async function scrapeGoogleReviews() {
       }
     }
     
-    console.log(`Scraping complete. Added ${newReviews} new reviews.`);
+    console.log(`Scraping complete. Added ${newReviews} new reviews out of ${reviews.length} total.`);
     return { success: true, newReviews, totalReviews: reviews.length };
     
   } catch (error) {
