@@ -115,45 +115,21 @@ async function scrapeGoogleReviews() {
             console.log('=== END DEBUG ===\n');
         }
         
-        // Try all possible name fields
-        const possibleNameFields = [
-            'author', 'author_name', 'name', 'reviewer_name', 'reviewer',
-            'review_author', 'review_author_name', 'author_alt', 'user_name',
-            'customer_name', 'profile_name', 'display_name'
-        ];
+        // Extract reviewer name from the correct field
+        const reviewerName = review.author_title || 
+                           review.author_name || 
+                           review.name || 
+                           review.author || 
+                           'Anonymous';
         
-        let reviewerName = 'Anonymous';
-        
-        // Check direct fields
-        for (const field of possibleNameFields) {
-            if (review[field] && review[field] !== '') {
-                reviewerName = review[field];
-                console.log(`✓ Found reviewer name in field '${field}': ${reviewerName}`);
-                break;
-            }
-        }
-        
-        // Check nested objects
-        if (reviewerName === 'Anonymous') {
-            if (review.author_profile && review.author_profile.name) {
-                reviewerName = review.author_profile.name;
-                console.log(`✓ Found reviewer name in author_profile.name: ${reviewerName}`);
-            } else if (review.profile && review.profile.name) {
-                reviewerName = review.profile.name;
-                console.log(`✓ Found reviewer name in profile.name: ${reviewerName}`);
-            }
-        }
-        
-        if (reviewerName === 'Anonymous') {
-            console.log('⚠ No reviewer name found, using Anonymous');
-        }
+        console.log(`✓ Found reviewer name: ${reviewerName}`);
 
         const reviewData = {
-            rating: review.rating,
+            rating: review.review_rating,
             reviewer_name: reviewerName,
-            review_text: review.text || review.review_text || review.comment || '',
-            review_date: review.date,
-            google_review_id: review.review_id || review.id || `${review.date}_${review.rating}_${reviewerName}`
+            review_text: review.review_text || '',
+            review_date: review.review_datetime_utc ? new Date(review.review_datetime_utc).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+            google_review_id: review.review_id || `${reviewerName}_${review.review_datetime_utc}`
         };
 
         // Send to Bubble
