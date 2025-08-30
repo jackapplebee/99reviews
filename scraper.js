@@ -1,7 +1,7 @@
 // Import fetch for Node.js compatibility
 const fetch = require('node-fetch');
 
-// Google Reviews Scraper - Historical Data Capture
+// Google Reviews Scraper - Daily Operation
 const OUTSCRAPER_API_KEY = process.env.OUTSCRAPER_API_KEY || 'ZDEwYTgxZTIxYzI2NGE1MTk4OWE2YzIxNmJmMjgzODd8N2Y3MDYzZTMxMQ';
 const BUBBLE_API_URL = 'https://feedback2-15788.bubbleapps.io/api/1.1/obj/Google_Review';
 const BUBBLE_API_TOKEN = process.env.BUBBLE_API_TOKEN || '0dfd48c46d7248ed9e3fdbf50b10a4a1';
@@ -9,22 +9,21 @@ const GOOGLE_BUSINESS_URL = 'https://www.google.com/maps/place/APPLEBEE\'s+-+Fis
 
 async function scrapeGoogleReviews() {
   try {
-    console.log('Starting Google Reviews historical data capture...');
+    console.log('Starting Google Reviews scrape...');
     
-    // Set up date range from August 20th, 2025 to today
+    // Set up 24-hour window from 4am yesterday to 4am today (London time)
     const now = new Date();
     const today4am = new Date();
     today4am.setHours(4, 0, 0, 0);
+    const yesterday4am = new Date(today4am);
+    yesterday4am.setDate(yesterday4am.getDate() - 1);
     
-    // Set start date to August 20th, 2025
-    const startDate = new Date('2025-08-20T04:00:00.000Z');
-    
-    console.log(`Looking for reviews from: ${startDate.toISOString()} to ${today4am.toISOString()}`);
+    console.log(`Looking for reviews between: ${yesterday4am.toISOString()} and ${today4am.toISOString()}`);
     
     // Initiate scraping request to Outscraper
     const params = new URLSearchParams({
         query: GOOGLE_BUSINESS_URL,
-        reviewsLimit: 50, // Increased to capture more historical reviews
+        reviewsLimit: 10, // Back to 10 for daily operation
         language: 'en',
         region: 'GB',
         sort: 'newest'
@@ -92,17 +91,17 @@ async function scrapeGoogleReviews() {
     const business = finalData.data[0];
     const allReviews = business.reviews_data || [];
     
-    // Filter reviews from August 20th onwards
+    // Filter reviews to 24-hour window
     const reviewsInRange = allReviews.filter(review => {
         if (!review.review_datetime_utc) return false;
         const reviewDate = new Date(review.review_datetime_utc);
-        return reviewDate >= startDate && reviewDate < today4am;
+        return reviewDate >= yesterday4am && reviewDate < today4am;
     });
 
     const totalReviews = allReviews.length;
     const newReviews = reviewsInRange.length;
     
-    console.log(`Found ${totalReviews} total reviews, ${newReviews} from August 20th onwards`);
+    console.log(`Found ${totalReviews} total reviews, ${newReviews} between 4am yesterday and 4am today`);
 
     let addedReviews = 0;
 
@@ -146,18 +145,18 @@ async function scrapeGoogleReviews() {
         }
     }
 
-    console.log(`Historical data capture complete. Added ${addedReviews} reviews out of ${newReviews} total reviews from August 20th.`);
+    console.log(`Scraping complete. Added ${addedReviews} new reviews out of ${newReviews} total new reviews.`);
     return { success: true, newReviews: addedReviews, totalReviews: newReviews };
 
   } catch (error) {
-    console.error('Historical data capture failed:', error);
+    console.error('Scraping failed:', error);
     return { success: false, error: error.message };
   }
 }
 
 // Auto-run when executed directly
 if (require.main === module) {
-  console.log('Starting historical Google Reviews data capture...');
+  console.log('Starting automated Google Reviews scraper...');
   scrapeGoogleReviews().then(result => {
     console.log('Final result:', result);
     process.exit(result.success ? 0 : 1);
