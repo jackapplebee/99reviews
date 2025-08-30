@@ -10,10 +10,10 @@ async function scrapeAllHistoricalReviews() {
   try {
     console.log('Starting comprehensive historical review collection...');
     
-    // Test with smaller dataset first to verify Bubble integration
+    // Get ALL reviews - complete historical dataset
     const params = new URLSearchParams({
         query: GOOGLE_BUSINESS_URL,
-        reviewsLimit: 100, // Small test batch to verify Business_Metrics saves correctly
+        reviewsLimit: 2000, // Set higher than actual count to ensure we get everything
         language: 'en',
         region: 'GB',
         sort: 'newest'
