@@ -20,20 +20,20 @@ async function scrapeGoogleReviews() {
     
     console.log(`Looking for reviews between: ${yesterday4am.toISOString()} and ${today4am.toISOString()}`);
     
-    // Initiate scraping request to Outscraper
-    const response = await fetch('https://api.outscraper.com/maps/reviews-v3', {
-        method: 'POST',
+    // Initiate scraping request to Outscraper (using GET method)
+    const params = new URLSearchParams({
+        query: GOOGLE_BUSINESS_URL,
+        reviewsLimit: 10, // Changed from 50 to 10
+        language: 'en',
+        region: 'GB',
+        sort: 'newest'
+    });
+    
+    const response = await fetch(`https://api.outscraper.com/maps/reviews-v3?${params}`, {
+        method: 'GET',
         headers: {
-            'X-API-KEY': OUTSCRAPER_API_KEY,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            query: [GOOGLE_BUSINESS_URL],
-            reviewsLimit: 10, // Changed from 50 to 10
-            language: 'en',
-            region: 'GB',
-            sort: 'newest'
-        })
+            'X-API-KEY': OUTSCRAPER_API_KEY
+        }
     });
 
     if (!response.ok) {
