@@ -1,0 +1,25 @@
+name: Historical Data Collection
+on:
+  workflow_dispatch: # Manual trigger only
+
+jobs:
+  historical-scrape:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+    
+    - name: Install dependencies
+      run: npm install
+    
+    - name: Run historical scraper
+      env:
+        OUTSCRAPER_API_KEY: ${{ secrets.OUTSCRAPER_API_KEY }}
+        BUBBLE_API_TOKEN: ${{ secrets.BUBBLE_API_TOKEN }}
+      run: node historical-scraper.js
